@@ -47,12 +47,12 @@ let isHeart = (x,z,y) => {
 
 if(true)
 {
-    let r = 15, R = 60;
-    for(let i = 0; i < 100000; i++){
+    let r = 15, R = 100;
+    for(let i = 0; i < 80000; i++){
         let rand = Math.pow(Math.random(), 1.5);
         let radius = Math.sqrt(R * R * rand + (1 - rand) * r * r);
         pts.push(new THREE.Vector3().setFromCylindricalCoords(radius, Math.random() * 2 * Math.PI, (Math.random() - 0.5) * 2 ));
-        sizes.push(Math.random() * 1.5 + 0.5);
+        sizes.push(Math.random() * 1.5 + 1);
         pushShift();
     }
 }
@@ -67,7 +67,7 @@ if(true)
         if(isHeart(rx,ry,rz))
         {
             pts.push(new THREE.Vector3(rx*scale,ry*scale,rz*scale));
-            sizes.push(Math.random() * 1.5 + 0.5);
+            sizes.push(Math.random() * 1.0 + 0.5);
             pushShift();
         }
     }
@@ -87,7 +87,7 @@ let onBeforeCompile = shader => {
     ).replace(
       `#include <color_vertex>`,
       `#include <color_vertex>
-        float d = length(abs(position) / vec3(40., 20., 40));
+        float d = length(abs(position) / vec3(70., 10., 70));
         d = clamp(d, 0., 1.);
         vColor = mix(vec3(227., 155., 0.), vec3(100., 50., 255.), d) / 255.;
       `
@@ -120,7 +120,7 @@ let onBeforeCompile = shader => {
             tt = pow(tt, 0.5);
         }
         float s22 = tt * 0.25 + 0.9;
-        s22 = 1.0 + d22 * (s22 - 1.0);
+        s22 = mix(1.0, s22, d22);
         transformed *= s22;
       `
     );
@@ -162,6 +162,6 @@ renderer.setAnimationLoop(() => {
   controls.update();
   let t = clock.getElapsedTime() * 0.5;
   gu.time.value = t * Math.PI;
-  p.rotation.y = t * 0.05;
+  p.rotation.y = t * 0.1;
   renderer.render(scene, camera);
 });
