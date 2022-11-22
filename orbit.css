@@ -1,0 +1,20 @@
+@import "https://fonts.googleapis.com/css2?family=Megrim&display=swap";
+body{
+  overflow: hidden;
+  margin: 0;
+}
+
+.word{
+    font-family: Pacifico, cursive;
+    font-size: 5vh;
+    position: absolute;
+    bottom: 20px;
+    right: 0;
+    left: 0;
+    text-align: center;
+    color: #ffce5f;
+    text-shadow: 0.2vh 0.2vh 0.2vh #bb03bb;
+    -webkit-font-smoothing: antialiased;
+    text-decoration: underline wavy;
+    filter: drop-shadow(0 0 10px black);
+}
