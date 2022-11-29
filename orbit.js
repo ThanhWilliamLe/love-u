@@ -4,10 +4,11 @@ import {OrbitControls} from "https://cdn.skypack.dev/three@0.136.0/examples/jsm/
 console.clear();
 
 let scene = new THREE.Scene();
-scene.background = new THREE.Color(0,0,0);
+scene.background = new THREE.Color(0x07021a);
+scene.fog = new THREE.Fog(0x07021a, 1, 60);
 let camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 1, 1000);
-camera.position.set(0, 1, 21);
-let renderer = new THREE.WebGLRenderer();
+camera.position.set(0, 2, 30);
+let renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 window.addEventListener("resize", event => {
@@ -18,7 +19,7 @@ window.addEventListener("resize", event => {
 
 let controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.enablePan = false;
+controls.enablePan = true;
 
 let gu = {
   time: {value: 0}
@@ -99,32 +100,30 @@ let onBeforeCompile = shader => {
         float moveS = mod(shift.y + shift.z * t, PI2);
         transformed += vec3(cos(moveS) * sin(moveT), cos(moveT), sin(moveS) * sin(moveT)) * shift.a;
 
-        if(t<1.25)
-        {
-            transformed *= pow(t / 1.25, 0.4);
-        }
-
         float d22 = length(transformed) / 15.0;
         d22 = 1.0 - clamp(d22, 0.0, 1.0);
         d22 = pow(d22, 0.8);
-        float tz0 = 3.5;
-        float tt = t * tz0;
-        if(mod(floor(tt / tz0), 2.0) <= 1.0)
+        if(d22>0.0)
         {
-            tt = (sin(tt) + 1.0) / 2.0;
-            tt = pow(tt, 2.0);
+          float tzA = 0.5;
+          float tzB = 1.25;
+          float tzSum = tzA + tzB;
+          float tt = mod(t, tzSum);
+          float ts = 0.0;
+          if(tt < tzA)
+          {
+            ts = 1.0 - pow(tt / tzA * 2.0 - 1.0, 2.0);
+          }
+          else
+          {
+          }
+          float s22 = ts * 0.15 + 0.9;
+          s22 = mix(1.0, s22, d22);
+          transformed *= s22;
         }
-        else
-        {
-            tt = (sin(tt) + 1.0) / 2.0;
-            tt = pow(tt, 0.5);
-        }
-        float s22 = tt * 0.25 + 0.9;
-        s22 = mix(1.0, s22, d22);
-        transformed *= s22;
       `
     );
-    console.log(shader.vertexShader);
+    // console.log(shader.vertexShader);
     shader.fragmentShader = `
       varying vec3 vColor;
       ${shader.fragmentShader}
@@ -138,7 +137,7 @@ let onBeforeCompile = shader => {
       `vec4 diffuseColor = vec4( diffuse, opacity );`,
       `vec4 diffuseColor = vec4( vColor, smoothstep(0.5, 0.1, d)/* * 0.5 + 0.5*/ );`
     );
-    console.log(shader.fragmentShader);
+    // console.log(shader.fragmentShader);
 };
     
 let g = new THREE.BufferGeometry().setFromPoints(pts);
@@ -147,7 +146,8 @@ g.setAttribute("shift", new THREE.Float32BufferAttribute(shift, 4));
 let m = new THREE.PointsMaterial({
   size: 0.125,
   transparent: true,
-  depthTest: false,
+  depthTest: true,
+  depthWrite: false,
   blending: THREE.AdditiveBlending,
   onBeforeCompile: onBeforeCompile
   });
@@ -156,12 +156,80 @@ p.rotation.order = "ZYX";
 p.rotation.z = 0.2;
 scene.add(p)
 
+let imageConfigs = [
+  {fileName:"1.jpg", ratio:1283/2048},
+  {fileName:"2.jpg", ratio:1284/1712},
+  {fileName:"3.jpg", ratio:1284/1712},
+  {fileName:"4.jpg", ratio:1284/1712},
+  {fileName:"5.jpg", ratio:1284/962},
+  {fileName:"6.jpg", ratio:1284/1712},
+];
+
+let imgGroup = new THREE.Group();
+let imgSizeScale = 4;
+imageConfigs.forEach((imgConfig,i)=>{
+  let height = imgSizeScale / (imgConfig.ratio + 1) * 2;
+  let width = height * imgConfig.ratio;
+  let geometry = new THREE.PlaneGeometry( width, height );
+  
+  let map = new THREE.TextureLoader().load( `orbit_imgs/${imgConfig.fileName}` );
+  let material = new THREE.MeshBasicMaterial( {
+    color: 0xffffff, 
+    map:map, 
+    side: THREE.DoubleSide, 
+  } );
+  let plane = new THREE.Mesh( geometry, material );
+
+  let spinEul = new THREE.Euler(0, Math.PI * 2 / imageConfigs.length * i, 0,'XYZ');
+  let shift = new THREE.Vector3(12,0,0);
+  shift.applyEuler(spinEul);
+  plane.position.copy(shift);
+
+  let tiltEul = new THREE.Euler(25 / 180 * Math.PI, -Math.PI / 2, 0,'YXZ');
+  let tiltRot = new THREE.Quaternion();
+  tiltRot.multiply(new THREE.Quaternion().setFromEuler(spinEul));
+  tiltRot.multiply(new THREE.Quaternion().setFromEuler(tiltEul));
+  plane.quaternion.copy(tiltRot);
+
+  imgGroup.add( plane );
+
+});
+imgGroup.rotation.order = "ZYX";
+imgGroup.rotation.z = 0.2;
+scene.add(imgGroup);
+
+let spriteMat = new THREE.SpriteMaterial( { 
+  fog:false, 
+  transparent:true, 
+  depthFunc:THREE.AlwaysDepth,
+  color: 0x000000, 
+  opacity: 1,
+} );
+let sprite = new THREE.Sprite(spriteMat);
+sprite.scale.set(999,999,999);
+scene.add(sprite);
+
 let clock = new THREE.Clock();
+let delay0 = 1.25;
+let zoomTime = 0.75;
 
 renderer.setAnimationLoop(() => {
   controls.update();
   let t = clock.getElapsedTime() * 0.5;
   gu.time.value = t * Math.PI;
   p.rotation.y = t * 0.1;
+  imgGroup.rotation.y = -t * 0.1 - 1.2;
+
+  if(t<delay0) return;
+  if(t<delay0+zoomTime)
+  {
+    let r = (t-delay0)/zoomTime;
+    let z = (24 - 250) * Math.pow(r, 0.3) + 250;
+    camera.position.z = z;
+    spriteMat.opacity = 1-r;
+
+    if(r>=1) sprite.removeFromParent();
+  }
+
   renderer.render(scene, camera);
 });
